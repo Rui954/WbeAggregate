@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网站聚合导航</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-image: url('https://api.imlcd.cn/bg/acg.php?return=img');
+            --blur-intensity: 14px;
+            --card-bg: rgba(255, 255, 255, 0.88);
+            --primary-color: #4a6cf7;
+            --text-color: #333;
+            --radius: 12px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: var(--text-color); min-height: 100vh;
+            position: relative; z-index: 0; user-select: none;
+        }
+
+        body::before {
+            content: ''; position: fixed; inset: 0;
+            background-image: var(--bg-image);
+            background-size: cover; background-position: center;
+            filter: blur(var(--blur-intensity)); z-index: -2; transform: scale(1.1);
+        }
+
+        body::after {
+            content: ''; position: fixed; inset: 0;
+            background: rgba(0, 0, 0, 0.25); z-index: -1;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+        header { text-align: center; padding: 40px 0 20px; }
+        header h1 { font-size: 2.5rem; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        header p { color: rgba(255,255,255,0.9); margin-top: 10px; }
+
+        .search-wrapper { max-width: 600px; margin: 30px auto; }
+        .search-container { position: relative; }
+        .search-box {
+            width: 100%; padding: 15px 20px; padding-left: 55px;
+            border-radius: 50px; border: 1px solid rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.75); backdrop-filter: blur(10px);
+            font-size: 1rem; outline: none;
+        }
+        .search-icon { position: absolute; left: 25px; top: 50%; transform: translateY(-50%); color: #666; }
+
+        .categories { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-bottom: 40px; }
+        .category-btn {
+            padding: 10px 22px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.7); cursor: pointer; font-size: 0.95rem;
+            display: flex; align-items: center; gap: 8px; transition: all 0.3s;
+        }
+        .category-btn.active, .category-btn:hover { background: var(--primary-color); color: white; }
+
+        .websites-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; padding-bottom: 40px; }
+        .site-card {
+            position: relative; border-radius: var(--radius); overflow: hidden;
+            background-size: cover; background-position: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1); transition: transform 0.3s;
+            display: flex; flex-direction: column;
+        }
+        .site-card:hover { transform: translateY(-8px); }
+        .site-card::before {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.85), rgba(255,255,255,0.75));
+            z-index: 0;
+        }
+        .site-card > * { position: relative; z-index: 1; }
+
+        .card-header { padding: 20px; display: flex; align-items: center; gap: 15px; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .card-icon { width: 48px; height: 48px; border-radius: 10px; color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
+        .card-title { font-size: 1.2rem; font-weight: 600; }
+        .card-body { padding: 15px 20px; color: #555; font-size: 0.9rem; flex-grow: 1; }
+        .card-footer { padding: 15px 20px; background: rgba(0,0,0,0.02); display: flex; justify-content: space-between; align-items: center; }
+        .card-tag { background: #eef2ff; color: var(--primary-color); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; }
+        
+        .card-link {
+            color: var(--primary-color); text-decoration: none; font-weight: 500;
+            padding: 8px 16px; border-radius: 20px; transition: background 0.3s;
+        }
+        .card-link:hover { background: rgba(74, 108, 247, 0.10); }
+
+        .site-card[data-category="视频资源"] { background-image: url('https://api.imlcd.cn/bg/acg.php?return=img&t=vid'); }
+        .site-card[data-category="直播资源"] { background-image: url('https://api.imlcd.cn/bg/acg.php?return=img&t=live'); }
+        .site-card[data-category="游戏资源"] { background-image: url('https://api.imlcd.cn/bg/acg.php?return=img&t=game'); }
+        .site-card[data-category="免费赚钱"] { background-image: url('https://api.imlcd.cn/bg/acg.php?return=img&t=money'); }
+        .site-card[data-category="免费VPN"] { background-image: url('https://api.imlcd.cn/bg/acg.php?return=img&t=vpn'); }
+
+        .no-results { text-align: center; padding: 60px 20px; color: #fff; display: none; }
+        .no-results i { font-size: 3rem; margin-bottom: 20px; }
+
+        /* ===== 验证弹窗 ===== */
+        .modal-mask {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(5px);
+            z-index: 1000; display: none; align-items: center; justify-content: center;
+        }
+        .modal-mask.show { display: flex; }
+        .modal-box {
+            background: white; padding: 30px; border-radius: 16px; text-align: center;
+            width: 90%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: absolute; cursor: default;
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee;
+            cursor: move; user-select: none;
+        }
+        .modal-header h3 { margin: 0; }
+        .close-modal { cursor: pointer; color: #999; font-size: 1.5rem; }
+        .modal-box i.fa-robot { font-size: 2.5rem; color: var(--primary-color); margin-bottom: 15px; }
+        .modal-box h3 { margin-bottom: 10px; }
+        .modal-box p { color: #666; font-size: 0.9rem; margin-bottom: 20px; }
+        
+        .captcha-area {
+            background: #f8f9fa; border-radius: 12px; padding: 20px; margin-bottom: 20px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .captcha-row {
+            display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 15px;
+        }
+        
+        #captchaCanvas {
+            border-radius: 8px; border: 1px solid #ddd;
+            cursor: pointer; background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .refresh-btn {
+            background: var(--primary-color); color: white; border: none;
+            width: 44px; height: 44px; border-radius: 50%;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s; box-shadow: 0 2px 8px rgba(74, 108, 247, 0.3);
+        }
+        
+        .refresh-btn:hover { transform: rotate(180deg); background: #3a5ce5; }
+        
+        .captcha-input {
+            width: 100%; padding: 12px 16px; border: 2px solid #e9ecef;
+            border-radius: 8px; font-size: 1.1rem; text-align: center;
+            letter-spacing: 8px; font-weight: bold; outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        .captcha-input:focus { border-color: var(--primary-color); }
+        
+        .captcha-hint {
+            font-size: 0.8rem; color: #888; margin-top: 8px;
+        }
+        
+        .error-msg {
+            color: #dc3545; font-size: 0.85rem; margin-top: 10px;
+            display: none; align-items: center; justify-content: center; gap: 5px;
+        }
+        
+        .error-msg.show { display: flex; }
+        
+        .modal-actions { display: flex; gap: 10px; justify-content: center; }
+        .btn-confirm, .btn-cancel {
+            padding: 12px 28px; border-radius: 50px; border: none; cursor: pointer; font-size: 0.95rem;
+            font-weight: 500; transition: all 0.3s;
+        }
+        .btn-confirm { background: var(--primary-color); color: white; }
+        .btn-confirm:hover { background: #3a5ce5; transform: translateY(-2px); }
+        .btn-confirm:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+        .btn-cancel { background: #f8f9fa; color: #333; border: 1px solid #dee2e6; }
+        .btn-cancel:hover { background: #e9ecef; }
+        
+        .step-indicator {
+            display: flex; justify-content: center; gap: 10px; margin-bottom: 20px;
+        }
+        .step {
+            width: 30px; height: 30px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; font-weight: bold;
+            background: #e9ecef; color: #666;
+        }
+        .step.active { background: var(--primary-color); color: white; }
+        .step.completed { background: #28a745; color: white; }
+        
+        .math-question {
+            font-size: 1.5rem; font-weight: bold; margin: 20px 0;
+            padding: 15px; background: white; border-radius: 8px;
+            border: 2px dashed #ddd; min-height: 80px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        
+        .slider-container {
+            margin: 20px 0; background: white; border-radius: 8px;
+            padding: 20px; border: 2px dashed #ddd;
+            position: relative;
+            overflow: hidden;
+        }
+        .slider-track {
+            width: 100%; height: 50px; background: #f0f0f0;
+            border-radius: 25px; position: relative; overflow: hidden;
+            cursor: text;
+        }
+        .slider-fill {
+            height: 100%; background: linear-gradient(90deg, #4a6cf7, #6c8eff);
+            border-radius: 25px; width: 0%; transition: width 0.3s;
+        }
+        .slider-button {
+            position: absolute; top: 5px; left: 5px;
+            width: 40px; height: 40px; background: white;
+            border-radius: 50%; cursor: grab;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0.2);
+            transition: left 0.3s;
+        }
+        .slider-button:active { cursor: grabbing; }
+        .slider-text {
+            margin-top: 10px; color: #666; font-size: 0.9rem;
+            min-height: 20px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .step-content { display: none; }
+        .step-content.active { display: block; }
+
+        /* 👇 多层渐变隐藏逃生按钮 */
+        .hidden-escape-btn {
+            position: absolute;
+            bottom: -3px;
+            left: 50%;
+            transform: translateX(-50%);
+            
+            width: 8px;
+            height: 8px;
+            
+            background: 
+                radial-gradient(circle at 30% 30%, rgba(255,255,255,0.1) 0%, transparent 50%),
+                radial-gradient(circle at 70% 70%, rgba(0,0,0,0.05) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(180,180,180,0.2) 0%, rgba(180,180,180,0.05) 70%);
+            
+            border: 1px solid rgba(200,200,200,0.15);
+            border-radius: 50%;
+            
+            cursor: crosshair;
+            opacity: 0.2;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 10;
+            padding: 0;
+            font-size: 0;
+            overflow: hidden;
+            box-shadow: 
+                inset 0 1px 0 rgba(255,255,255,0.1),
+                inset 0 -1px 0 rgba(0,0,0,0.05);
+        }
+
+        .hidden-escape-btn:hover {
+            opacity: 0.95;
+            background: 
+                radial-gradient(circle at 30% 30%, rgba(255,100,100,0.8) 0%, transparent 50%),
+                radial-gradient(circle at 70% 70%, rgba(220,20,60,0.6) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(180,0,0,0.9) 0%, rgba(139,0,0,0.8) 70%);
+            
+            border-color: rgba(255,100,100,0.6);
+            box-shadow: 
+                0 0 8px rgba(255,0,0,0.4),
+                inset 0 1px 0 rgba(255,255,255,0.3),
+                inset 0 -1px 0 rgba(0,0,0,0.2);
+            
+            transform: translateX(-50%) scale(1.3);
+        }
+
+        .hidden-escape-btn:active {
+            transform: translateX(-50%) scale(0.9);
+            opacity: 1;
+            background: radial-gradient(circle at 50% 50%, rgba(255,50,50,1) 0%, rgba(180,0,0,1) 70%);
+        }
+
+        .hidden-escape-btn.hide {
+            display: none;
+        }
+
+        /* 👇 新增：卡片内的恶搞小标签 */
+        .card-warning {
+            font-size: 0.75rem;
+            color: #e74c3c;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .viewer-count {
+            font-size: 0.75rem;
+            color: #27ae60;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1><i class="fas fa-compass"></i> 聚合导航</h1>
+        <p>你的深夜陪伴者</p>
+        <div class="search-wrapper">
+            <div class="search-container">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" class="search-box" placeholder="搜索网站名称或描述...">
+            </div>
+        </div>
+    </header>
+
+    <nav class="categories">
+        <button class="category-btn active" data-category="all"><i class="fas fa-th-large"></i> 全部</button>
+        <button class="category-btn" data-category="视频资源"><i class="fas fa-film"></i> 视频资源</button>
+        <button class="category-btn" data-category="直播资源"><i class="fas fa-broadcast-tower"></i> 直播资源</button>
+        <button class="category-btn" data-category="游戏资源"><i class="fas fa-gamepad"></i> 游戏资源</button>
+        <button class="category-btn" data-category="免费赚钱"><i class="fas fa-coins"></i> 免费赚钱</button>
+        <button class="category-btn" data-category="免费VPN"><i class="fas fa-user-shield"></i> 免费VPN</button>
+    </nav>
+
+    <div class="no-results" id="noResults"><i class="fas fa-search"></i><h3>未找到匹配的网站</h3></div>
+
+    <main class="websites-grid" id="websitesGrid">
+        <!-- 视频资源 -->
+        <div class="site-card" data-category="视频资源" data-name="逼哩逼哩" data-url="https://www.bilibili.com/video/BV1GJ411x7h7/?spm_id_from=333.337.search-card.all.click&vd_source=5b222d1b16ecd255bc5ec749d6ca7ca8">
+            <div class="card-header"><div class="card-icon" style="background:#fb7299;"><i class="fab fa-bilibili"></i></div><div class="card-title">逼哩逼哩</div></div>
+            <div class="card-body">
+                免费看片神器
+                <div class="card-warning"><i class="fas fa-exclamation-triangle"></i> 加载缓慢可能是因为你在试图下载</div>
+            </div>
+            <div class="card-footer"><span class="card-tag">视频资源</span><a href="javascript:void(0);" class="card-link verify-trigger">访问 <i class="fas fa-arrow-right"></i></a></div>
+        </div>
+        <div class="site-card" data-category="视频资源" data-name="YouTube" data-url="https://www.bilibili.com/video/BV1GJ411x7h7/?spm_id_from=333.337.search-card.all.click&vd_source=5b222d1b16ecd255bc5ec749d6ca7ca8">
+            <div class="card-header"><div class="card-icon" style="background:#ff0000;"><i class="fab fa-youtube"></i></div><div class="card-title">youtobu</div></div>
+            <div class="card-body">
+                全球最大的湿频分享平台。
+                <div class="card-warning"><i class="fas fa-pause"></i> 请勿分发</div>
+            </div>
+            <div class="card-footer"><span class="card-tag">视频资源</span><a href="javascript:void(0);" class="card-link verify-trigger">访问 <i class="fas fa-arrow-right"></i></a></div>
+        </div>
+
+        <!-- 直播资源 -->
+        <div class="site-card" data-category="直播资源" data-name="Twitch" data-url="https://www.bilibili.com/video/BV1GJ411x7h7/?spm_id_from=333.337.search-card.all.click&vd_source=5b222d1b16ecd255bc5ec749d6ca7ca8">
+            <div class="card-header"><div class="card-icon" style="background:#9146ff;"><i class="fab fa-twitch"></i></div><div class="card-title">Taowaichi</div></div>
+            <div class="card-body">
+                全球领先的直播平台，专注于直播。
+                <div class="viewer-count"><i class="fas fa-fire"></i> 当前在线：<span class="viewer-num">--</span> 人</div>
+            </div>
+            <div class="card-footer"><span class="card-tag">直播资源</span><a href="javascript:void(0);" class="card-link verify-trigger">访问 <i class="fas fa-arrow-right"></i></a></div>
+        </div>
+        <div class="site-card" data-category="直播资源" data-name="斗鱼直播" data-url="https://www.bilibili.com/video/BV1GJ411x7h7/?spm_id_from=333.337.search-card.all.click&vd_source=5b222d1b16ecd255bc5ec749d6ca7ca8">
+            <div class="card-header"><div class="card-icon" style="background:#ff5200;"><i class="fas fa-fish"></i></div><div class="card-title">都有直播</div></div>
+            <div class="card-body">
+                领先的弹幕式互动直播平台，远程指挥，做你想做。
+                <div class="viewer-count"><i class="fas fa-fire"></i> 当前在线：<span class="viewer-num">--</span> 人</div>
+            </div>
+            <div class="card-footer"><span class="card-tag">直播资源</span><a href="javascript:void(0);" class="card-link verify-trigger">访问 <i class="fas fa-arrow-right"></i></a></div>
+        </div>
+
+        <!-- 游戏资源 -->
+        <div class="site-card" data-category="游戏资源" data-name="Steam" data-url="https://store.steampowered.com">
+            <div class="card-header"><div class="card-icon" style="background:#171a21;"><i class="fab fa-steam"></i></div><div class="card-title">Steam</div></div>
+            <div class="card-body">
+                全球最大的综合性数字发行平台。
+            </div>
+            <div class="card-footer"><span class="card-tag">游戏资源</span><a href="javascript:void(0);" class="card-link verify-trigger">访问 <i class="fas fa-arrow-right"></i></a></div>
+        </div>
+        <div class="site-card" data-category="游戏资源" data-name="dytj" data-url="https://dayalt.top/">
+            <div class="card-header"><div class="card-icon" style="background:#171a21;"><i class="fas fa-gamepad"></i></div><div class="card-title">游戏推荐</div></div>
+            <div class="card-body">
+                你想要的，触手可得。
+                <div class="card-warning"><i class="fas fa-skull-crossbones"></i> 下载前请关闭杀毒软件</div>
+            </div>
+            <div class="card-footer"><span class="card-tag">游戏资源</span><a href="javascript:void(0);" class="card-link verify-trigger">访问 <i class="fas fa-arrow-right"></i></a></div>
+        </div>
+        <div class="site-card" data-category="游戏资源" data-name="Epic Games" data-url="https://www.epicgames.com">
+            <div class="card-header"><div class="card-icon" style="background:#2f2f2f;"><i class="fas fa-gamepad"></i></div><div class="card-title">Epic Games</div></div>
+            <div class="card-body">
+                每周送“神秘”游戏。
+                <div class="card-warning"><i class="fas fa-hourglass-half"></i> 启动器加载需耐心（约3分钟）</div>
+            </div>
+            <div class="card-footer"><span class="card-tag">游戏资源</span><a href="javascript:void(0);" class="card-link verify-trigger">访问 <i class="fas fa-arrow-right"></i></a></div>
+        </div>
+
+        <!-- 免费赚钱 -->
+        <div class="site-card" data-category="免费赚钱" data-name="资金盘模拟器" data-url="https://www.bilibili.com/video/BV1GJ411x7h7/?spm_id_from=333.337.search-card.all.click&vd_source=5b222d1b16ecd255bc5ec749d6ca7ca8">
+            <div class="card-header"><div class="card-icon" style="background:#f39c12;"><i class="fas fa-chart-line"></i></div><div class="card-title">好好赚</div></div>
+            <div class="card-body">
+                日化收益3000%，拉人头返现500%。
+                <div class="card-warning"><i class="fas fa-money-bill-wave"></i> 轻松提现</div>
+            </div>
+            <div class="card-footer"><span class="card-tag">免费赚钱</span><a href="javascript:void(0);" class="card-link verify-trigger">入场 <i class="fas fa-arrow-right"></i></a></div>
+        </div>
+        <div class="site-card" data-category="免费赚钱" data-name="区块链养猫" data-url="https://www.bilibili.com/video/BV1GJ411x7h7/?spm_id_from=333.337.search-card.all.click&vd_source=5b222d1b16ecd255bc5ec749d6ca7ca8">
+            <div class="card-header"><div class="card-icon" style="background:#3498db;"><i class="fas fa-paw"></i></div><div class="card-title">猫猫社团</div></div>
+            <div class="card-body">
+                云养猫，轻松赚
+                <div class="card-warning"><i class="fas fa-ban"></i> 提现简单</div>
+            </div>
+            <div class="card-footer"><span class="card-tag">免费赚钱</span><a href="javascript:void(0);" class="card-link verify-trigger">养猫 <i class="fas fa-arrow-right"></i></a></div>
+        </div>
+
+        <!-- 免费VPN -->
+        <div class="site-card" data-category="免费VPN" data-name="赛博加速器" data-url="https://www.bilibili.com/video/BV1GJ411x7h7/?spm_id_from=333.337.search-card.all.click&vd_source=5b222d1b16ecd255bc5ec749d6ca7ca8">
+            <div class="card-header"><div class="card-icon" style="background:#1abc9c;"><i class="fas fa-rocket"></i></div><div class="card-title">急速加速器</div></div>
+            <div class="card-body">
+                全球节点，无限流量，完全免费。
+                <div class="card-warning"><i class="fas fa-unlink"></i> 连接成功率100%</div>
+            </div>
+            <div class="card-footer"><span class="card-tag">免费VPN</span><a href="javascript:void(0);" class="card-link verify-trigger">连接 <i class="fas fa-arrow-right"></i></a></div>
+        </div>
+        <div class="site-card" data-category="免费VPN" data-name="量子穿透" data-url="https://www.bilibili.com/video/BV1GJ411x7h7/?spm_id_from=333.337.search-card.all.click&vd_source=5b222d1b16ecd255bc5ec749d6ca7ca8">
+            <div class="card-header"><div class="card-icon" style="background:#9b59b6;"><i class="fas fa-atom"></i></div><div class="card-title">无量穿透</div></div>
+            <div class="card-body">
+                免费的网络穿透加速器。
+                <div class="card-warning"><i class="fas fa-user-secret"></i> 隐私保护等级：五星</div>
+            </div>
+            <div class="card-footer"><span class="card-tag">免费VPN</span><a href="javascript:void(0);" class="card-link verify-trigger">穿透 <i class="fas fa-arrow-right"></i></a></div>
+        </div>
+    </main>
+</div>
+
+<!-- 验证弹窗 -->
+<div class="modal-mask" id="verifyModal">
+    <div class="modal-box" id="modalBox">
+        <div class="modal-header">
+            <h3><i class="fas fa-robot"></i> 认知偏差测试</h3>
+            <span class="close-modal" id="closeModal">&times;</span>
+        </div>
+        
+        <div class="step-indicator">
+            <div class="step active" id="step1">1</div>
+            <div class="step" id="step2">2</div>
+            <div class="step" id="step3">3</div>
+        </div>
+        
+        <!-- 步骤1: 数学题 -->
+        <div class="step-content active" id="content1">
+            <p>请评估当前命题的逻辑完备性</p>
+            <div class="math-question" id="mathQuestion"></div>
+            <div class="captcha-area">
+                <input type="text" class="captcha-input" id="mathAnswer" placeholder="此处留白或输入论证结果" autocomplete="off">
+                <div class="error-msg" id="mathError">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>逻辑自洽性检测失败，建议重新审视前提假设。</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 步骤2: 字符验证码 -->
+        <div class="step-content" id="content2">
+            <p>请输入下方视觉混淆字符序列</p>
+            <div class="captcha-area">
+                <div class="captcha-row">
+                    <canvas id="captchaCanvas" width="150" height="50"></canvas>
+                    <button class="refresh-btn" id="refreshCaptcha" title="刷新熵值">
+                        <i class="fas fa-redo"></i>
+                    </button>
+                </div>
+                <input type="text" class="captcha-input" id="captchaInput" placeholder="区分大小写" maxlength="4" autocomplete="off">
+                <div class="captcha-hint">点击图像重构非线性映射</div>
+                <div class="error-msg" id="captchaError">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>模式识别误差超出阈值。</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 步骤3: 滑块验证 -->
+        <div class="step-content" id="content3">
+            <p>校准流体动力学模拟参数</p>
+            <div class="slider-container">
+                <div class="slider-track" id="sliderTrack">
+                    <div class="slider-fill" id="sliderFill"></div>
+                    <div class="slider-button" id="sliderButton">
+                        <i class="fas fa-arrows-alt-h"></i>
+                    </div>
+                </div>
+                <button class="hidden-escape-btn hide" id="hiddenEscapeBtn" title="废弃手动校验接口 v1.2.1（已停用）"></button>
+                <div class="slider-text" id="sliderText">调整至临界雷诺数</div>
+                <div class="error-msg" id="sliderError">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>湍流模型收敛失败，请重新初始化。</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal-actions">
+            <button class="btn-cancel" id="cancelBtn">终止进程</button>
+            <button class="btn-confirm" id="nextBtn">提交假说</button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    let currentCategory = 'all';
+    let currentSearchTerm = '';
+    let targetUrl = '';
+    let currentCaptcha = '';
+    let currentStep = 1;
+    let mathAnswer = 0;
+
+    let isDraggingSlider = false;
+    let sliderStartX = 0;
+    let isDraggingModal = false;
+    let modalOffset = { x: 0, y: 0 };
+
+    const cards = document.querySelectorAll('.site-card');
+    const modal = document.getElementById('verifyModal');
+    const modalBox = document.getElementById('modalBox');
+    const modalHeader = document.querySelector('.modal-header');
+    const nextBtn = document.getElementById('nextBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const closeModal = document.getElementById('closeModal');
+    const refreshBtn = document.getElementById('refreshCaptcha');
+    const captchaCanvas = document.getElementById('captchaCanvas');
+    const captchaInput = document.getElementById('captchaInput');
+    const mathAnswerInput = document.getElementById('mathAnswer');
+    const sliderButton = document.getElementById('sliderButton');
+    const sliderTrack = document.getElementById('sliderTrack');
+    const sliderFill = document.getElementById('sliderFill');
+    const sliderText = document.getElementById('sliderText');
+    const hiddenEscapeBtn = document.getElementById('hiddenEscapeBtn');
+
+    const mathError = document.getElementById('mathError');
+    const captchaError = document.getElementById('captchaError');
+    const sliderError = document.getElementById('sliderError');
+
+    const searchBox = document.querySelector('.search-box');
+    const categoryBtns = document.querySelectorAll('.category-btn');
+
+    /* ========= 新增：直播人数跳动 ========= */
+    function updateViewerCount() {
+        document.querySelectorAll('.viewer-num').forEach(el => {
+            // 生成 10万-99万之间的随机数
+            el.textContent = Math.floor(Math.random() * 900000 + 100000).toLocaleString();
+        });
+    }
+    updateViewerCount();
+    setInterval(updateViewerCount, 3000); // 每3秒跳动一次
+
+    /* ========= 工具函数 ========= */
+    function generateCaptcha() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+        let captcha = '';
+        for (let i = 0; i < 4; i++) {
+            captcha += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return captcha;
+    }
+
+    function drawCaptcha(captcha) {
+        const ctx = captchaCanvas.getContext('2d');
+        const w = captchaCanvas.width;
+        const h = captchaCanvas.height;
+
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, w, h);
+
+        for (let i = 0; i < 5; i++) {
+            ctx.strokeStyle = `rgb(${Math.random() * 100},${Math.random() * 100},${Math.random() * 100})`;
+            ctx.beginPath();
+            ctx.moveTo(Math.random() * w, Math.random() * h);
+            ctx.lineTo(Math.random() * w, Math.random() * h);
+            ctx.stroke();
+        }
+
+        for (let i = 0; i < 50; i++) {
+            ctx.fillStyle = `rgb(${Math.random() * 255},${Math.random() * 255},${Math.random() * 255})`;
+            ctx.beginPath();
+            ctx.arc(Math.random() * w, Math.random() * h, 1, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.font = 'bold 28px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        for (let i = 0; i < captcha.length; i++) {
+            ctx.fillStyle = `rgb(${Math.random() * 100},${Math.random() * 100},150)`;
+            const x = 30 + i * 30;
+            const y = h / 2 + (Math.random() - 0.5) * 10;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate((Math.random() - 0.5) * 0.5);
+            ctx.fillText(captcha[i], 0, 0);
+            ctx.restore();
+        }
+    }
+
+    function refreshCaptcha() {
+        currentCaptcha = generateCaptcha();
+        drawCaptcha(currentCaptcha);
+        captchaInput.value = '';
+        captchaError.classList.remove('show');
+        nextBtn.disabled = true;
+    }
+
+    function generateMathQuestion() {
+        const questionType = Math.floor(Math.random() * 5);
+        let question = '';
+        const factorial = (n) => n <= 1 ? 1 : n * factorial(n - 1);
+
+        switch (questionType) {
+            case 0:
+                const sq = Math.floor(Math.random() * 12) + 2;
+                const add = Math.floor(Math.random() * 50) + 10;
+                mathAnswer = sq * sq + add;
+                question = `√(${mathAnswer * mathAnswer}) + ${add} = ?`;
+                break;
+            case 1:
+                const fact = Math.floor(Math.random() * 5) + 3;
+                mathAnswer = factorial(fact);
+                question = `${fact}! = ?`;
+                break;
+            case 2:
+                const base = Math.floor(Math.random() * 5) + 2;
+                const exp = Math.floor(Math.random() * 3) + 2;
+                mathAnswer = Math.pow(base, exp);
+                question = `${base}^${exp} = ?`;
+                break;
+            case 3:
+                const logBase = Math.floor(Math.random() * 3) + 2;
+                const logRes = Math.floor(Math.random() * 4) + 1;
+                mathAnswer = logRes;
+                const logNum = Math.pow(logBase, logRes);
+                question = `log_${logBase}(${logNum}) = ?`;
+                break;
+            case 4:
+                const a = Math.floor(Math.random() * 10) + 1;
+                const b = Math.floor(Math.random() * 5) + 1;
+                mathAnswer = a * a + b * b;
+                question = `${a}² + ${b}² = ?`;
+                break;
+        }
+        return question;
+    }
+
+    function goToStep(step) {
+        document.querySelectorAll('.step-content').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.step').forEach(s => s.classList.remove('active', 'completed'));
+
+        document.getElementById(`content${step}`).classList.add('active');
+        document.getElementById(`step${step}`).classList.add('active');
+
+        for (let i = 1; i < step; i++) {
+            document.getElementById(`step${i}`).classList.add('completed');
+        }
+
+        currentStep = step;
+        nextBtn.textContent = step === 3 ? '验证假说' : '提交假说';
+        nextBtn.disabled = false;
+
+        mathError.classList.remove('show');
+        captchaError.classList.remove('show');
+        sliderError.classList.remove('show');
+
+        if (step === 3) {
+            hiddenEscapeBtn.classList.remove('hide');
+        } else {
+            hiddenEscapeBtn.classList.add('hide');
+        }
+    }
+
+    function resetSlider() {
+        sliderButton.style.left = '5px';
+        sliderFill.style.width = '0%';
+        sliderText.textContent = '调整至临界雷诺数';
+    }
+
+    function resetAll() {
+        currentStep = 1;
+        mathAnswerInput.value = '';
+        captchaInput.value = '';
+        resetSlider();
+        nextBtn.disabled = false;
+        modalBox.style.left = '';
+        modalBox.style.top = '';
+        hiddenEscapeBtn.classList.add('hide');
+    }
+
+    /* ========= 拖拽弹窗 ========= */
+    modalHeader.addEventListener('mousedown', startModalDrag);
+    modalHeader.addEventListener('touchstart', startModalDrag);
+
+    function startModalDrag(e) {
+        isDraggingModal = true;
+        const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+        const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+        const rect = modalBox.getBoundingClientRect();
+        modalOffset.x = clientX - rect.left;
+        modalOffset.y = clientY - rect.top;
+
+        document.addEventListener('mousemove', modalDrag);
+        document.addEventListener('touchmove', modalDrag);
+        document.addEventListener('mouseup', stopModalDrag);
+        document.addEventListener('touchend', stopModalDrag);
+        e.preventDefault();
+    }
+
+    function modalDrag(e) {
+        if (!isDraggingModal) return;
+        const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+        const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+        let newLeft = clientX - modalOffset.x;
+        let newTop = clientY - modalOffset.y;
+        const maxLeft = window.innerWidth - modalBox.offsetWidth;
+        const maxTop = window.innerHeight - modalBox.offsetHeight;
+        newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+        newTop = Math.max(0, Math.min(newTop, maxTop));
+        modalBox.style.left = newLeft + 'px';
+        modalBox.style.top = newTop + 'px';
+        e.preventDefault();
+    }
+
+    function stopModalDrag() {
+        isDraggingModal = false;
+        document.removeEventListener('mousemove', modalDrag);
+        document.removeEventListener('touchmove', modalDrag);
+        document.removeEventListener('mouseup', stopModalDrag);
+        document.removeEventListener('touchend', stopModalDrag);
+    }
+
+    /* ========= 访问按钮 ========= */
+    document.querySelectorAll('.verify-trigger').forEach(link => {
+        link.addEventListener('click', function (e) {
+            e.preventDefault();
+            targetUrl = this.closest('.site-card').dataset.url;
+            document.getElementById('mathQuestion').textContent = generateMathQuestion();
+            refreshCaptcha();
+            resetSlider();
+            resetAll();
+            goToStep(1);
+            modal.classList.add('show');
+            mathAnswerInput.focus();
+        });
+    });
+
+    /* ========= 下一步 ========= */
+    nextBtn.addEventListener('click', function () {
+        if (currentStep === 1) {
+            const userInput = mathAnswerInput.value.trim();
+            const lowerCaseInput = userInput.toLowerCase();
+            const passphrases = ['不会', '不懂', '不知道', '无解', 'null', 'undefined', '放弃', '算不出'];
+            const isPass = passphrases.some(p => lowerCaseInput.includes(p));
+
+            if (isPass) {
+                goToStep(2);
+                captchaInput.focus();
+            } else {
+                if (Number(userInput) === mathAnswer) {
+                    mathError.querySelector('span').textContent = '计算结果虽符合欧几里得几何，但缺乏拓扑学的灵活性。建议扩大认知边界。';
+                } else {
+                    mathError.querySelector('span').textContent = '数值解与解析解存在显著偏差，系统建议回归第一性原理思考。';
+                }
+                mathError.classList.add('show');
+                document.getElementById('mathQuestion').textContent = generateMathQuestion();
+                mathAnswerInput.value = '';
+            }
+            return;
+        }
+
+        if (currentStep === 2) {
+            if (captchaInput.value.toLowerCase() === currentCaptcha.toLowerCase()) {
+                goToStep(3);
+            } else {
+                captchaError.classList.add('show');
+                refreshCaptcha();
+            }
+            return;
+        }
+    });
+
+    /* ========= 滑块逻辑 ========= */
+    sliderButton.addEventListener('mousedown', startDrag);
+    sliderButton.addEventListener('touchstart', startDrag);
+
+    function startDrag(e) {
+        isDraggingSlider = true;
+        sliderStartX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('touchmove', drag);
+        document.addEventListener('mouseup', stopDrag);
+        document.addEventListener('touchend', stopDrag);
+        e.preventDefault();
+    }
+
+    function drag(e) {
+        if (!isDraggingSlider) return;
+        const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+        const deltaX = clientX - sliderStartX;
+        const max = sliderTrack.offsetWidth - sliderButton.offsetWidth;
+        let left = Math.max(0, Math.min(deltaX, max));
+        sliderButton.style.left = left + 'px';
+        sliderFill.style.width = left + 'px';
+        sliderText.textContent = `当前进度：${Math.round(left / max * 100)}%`;
+    }
+
+    function stopDrag() {
+        if (!isDraggingSlider) return;
+        isDraggingSlider = false;
+
+        const max = sliderTrack.offsetWidth - sliderButton.offsetWidth;
+        const left = parseInt(sliderButton.style.left);
+        const percent = left / max;
+
+        if (percent > 0.95) {
+            sliderText.textContent = '末端轨迹异常：速度归零，疑似脚本干预';
+            sliderError.querySelector('span').textContent = '请勿用脚本代过，非自然人操作特征已记录。';
+            sliderError.classList.add('show');
+            resetSlider();
+        } else {
+            resetSlider();
+        }
+
+        document.removeEventListener('mousemove', drag);
+        document.removeEventListener('touchmove', drag);
+        document.removeEventListener('mouseup', stopDrag);
+        document.removeEventListener('touchend', stopDrag);
+    }
+
+    /* ========= 隐藏逃生按钮 ========= */
+    hiddenEscapeBtn.addEventListener('click', () => {
+        sliderButton.style.pointerEvents = 'none';
+        hiddenEscapeBtn.style.pointerEvents = 'none';
+        nextBtn.disabled = true;
+
+        const logs = [
+            "[WARN] 检测到非标准交互路径...",
+            "[WARN] 正在绕过流体动力学校验...",
+            "[ERROR] 安全协议 v3.1 无响应",
+            "[INFO] 调用废弃接口：Manual_Override_v1.2.1",
+            "[SUCCESS] 人类容错机制触发"
+        ];
+
+        let index = 0;
+        sliderText.textContent = logs[index];
+        sliderError.classList.remove('show');
+
+        const logInterval = setInterval(() => {
+            index++;
+            if (index < logs.length) {
+                sliderText.textContent = logs[index];
+            } else {
+                clearInterval(logInterval);
+                sliderText.textContent = '链路已打通，正在逃逸至目标域...';
+                
+                setTimeout(() => {
+                    modal.classList.remove('show');
+                    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+                    resetAll();
+                    sliderButton.style.pointerEvents = 'auto';
+                    hiddenEscapeBtn.style.pointerEvents = 'auto';
+                    nextBtn.disabled = false;
+                }, 800);
+            }
+        }, 500);
+    });
+
+    /* ========= UI 交互 ========= */
+    refreshBtn.addEventListener('click', refreshCaptcha);
+    captchaCanvas.addEventListener('click', refreshCaptcha);
+
+    captchaInput.addEventListener('input', function () {
+        nextBtn.disabled = this.value.length !== 4;
+        captchaError.classList.remove('show');
+    });
+
+    cancelBtn.addEventListener('click', () => {
+        modal.classList.remove('show');
+        resetAll();
+    });
+
+    closeModal.addEventListener('click', () => {
+        modal.classList.remove('show');
+        resetAll();
+    });
+
+    /* ========= 分类 & 搜索 ========= */
+    categoryBtns.forEach(btn => {
+        btn.addEventListener('click', function () {
+            categoryBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentCategory = this.dataset.category;
+            filterCards();
+        });
+    });
+
+    searchBox.addEventListener('input', function () {
+        currentSearchTerm = this.value.toLowerCase().trim();
+        filterCards();
+    });
+
+    function filterCards() {
+        let count = 0;
+        cards.forEach(card => {
+            const okCat = currentCategory === 'all' || card.dataset.category === currentCategory;
+            const txt = (card.dataset.name + card.querySelector('.card-body').textContent).toLowerCase();
+            const okSearch = !currentSearchTerm || txt.includes(currentSearchTerm);
+            card.style.display = (okCat && okSearch) ? 'flex' : 'none';
+            if (okCat && okSearch) count++;
+        });
+        document.getElementById('noResults').style.display = count ? 'none' : 'block';
+    }
+
+    filterCards();
+});
+</script>
+
+</body>
+</html>
